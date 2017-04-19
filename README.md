@@ -47,16 +47,19 @@ Tein kansion public_html kotihakemistooni, johon tiedoston index.html. Tiedostoo
 	$ nano index.html
 
 Tein muutokset hosts tiedostoon lisäten oikeat sivut:
+	
 	$ sudoedit /etc/hosts
- 127.0.0.1 kokei.lu
- 127.0.1.1 www.kokei.lu
+ 	127.0.0.1 kokei.lu
+ 	127.0.1.1 www.kokei.lu
 
-#Puppet modulin luonti
+# Puppet modulin luonti
 
 Tietenkin aluksin asennetaan koneelle Puppet:
+	
 	$ sudo apt-get -y install puppet
 
 Perinteisen kaavan mukaan siirryin modules kansioon, minne loin manifests ja templates -kansiot uuden virtualhost kansion alle.
+
 	$ cd /etc/puppet/modules
 	$ sudo mkdir virtualhost
 	cd virtualhost/
@@ -64,9 +67,11 @@ Perinteisen kaavan mukaan siirryin modules kansioon, minne loin manifests ja tem
 	$ sudo mkdir templates
 
 Siirryin templates kansioon ja kopioin sinne /etc/apache2/sites-available/kokeilu.conf tiedostoni johon muutin päätteeksi erb. 
+
 	$ sudo cp /etc/apache2/sites-available/kokeilu.conf kokeilu.conf.erb
 
 Saman tein myös hosts tiedostolle:
+
 	$ sudo cp /etc/hosts hosts.erb
 
 Tein templates kansioon tiedoston index.html.erb, joka toimii mallina käyttäjän kotisivulle. Itse tiedoston mallina käytin W3schoolin etusivua.
@@ -75,6 +80,7 @@ Tein templates kansioon tiedoston index.html.erb, joka toimii mallina käyttäj�
 
 
 Kirjoitin opettajan mallin mukaan tiedostot start.sh ja apply.sh kansioon /home/xubuntu/virtualhost
+	
 	#start.sh
 	setxkbmap fi
 	sudo apt-get update
@@ -82,6 +88,7 @@ Kirjoitin opettajan mallin mukaan tiedostot start.sh ja apply.sh kansioon /home/
 	git clone https://github.com/AAHyv/har3.git
 	cd har3
 	bash apply.sh
+	
 	#apply.sh
 	sudo puppet apply --modulepath puppet/modules/ -e 'class {hellotero:}'
 
@@ -92,8 +99,8 @@ Seuraavaksi tein kansioon manifests tiedoston inip.pp:
                 	ensure => 'installed',
                 	allowcdrom => 'true',
         	}
-        	file { '/etc/apache2/sites-available/oliot.conf':
-                	content => template('virtualhost/oliot.conf.erb'),
+        	file { '/etc/apache2/sites-available/kokeilu.conf':
+                	content => template('virtualhost/kokeilu.conf.erb'),
                 	notify => Service['apache2'],
         	}
         	file { '/etc/hosts':
@@ -105,3 +112,47 @@ Seuraavaksi tein kansioon manifests tiedoston inip.pp:
         	}
     	}
 
+Tässä vaiheessa aloin uppaamaan kaiken Gittiin asennettua sen. Olin juuri saanut kaiken (tämän raportin mukaan lukien) pushattua kun kone jäätyi ja jouduin restarttaamaan menettäen kaiken mitä olin tehnyt. GIT pelasit!
+
+Kun kuitenkin yritin ajaa modulini hakien sen nyt jo Githubista sain virhe ilmoituksen joka väittää ettei sivustoani ole olemassa. Enkä osaa keksiä mistä edes etsiä vikaa.
+
+	sudo a2ensite 000-defaul.conf && a2dissite janipoutaorg.conf
+
+Tein kuitenkin veilä muutokset init.pp tiedostooni sivun https://www.puppetcookbook.com/posts/exec-a-command-in-a-manifest.html ohjeiden mukaan. Oheiselta sivustolta selvitin aiemmin, kuinka tehdään kansio Puppetilla.
+	
+	class virtualhost {
+        	package { 'apache2':
+                	ensure => 'installed',
+                	allowcdrom => 'true',
+        	}
+        	file { '/etc/apache2/sites-available/kokeilu.conf':
+                	content => template('virtualhost/kokeilu.conf.erb'),
+                	require => Service['apache2'],
+        	}
+        	file { '/etc/hosts':
+                	content => template('virtualhost/hosts.erb'),
+                	require => Service['apache2'],
+        	}
+        	file { '/home/xubuntu/public_html':
+                	ensure => 'directory',
+        	}
+        	file { '/home/xubuntu/public_html/index.html':
+                	content => template('virtualhost/index.html.erb'),
+                	require => File['/home/xubuntu/public_html'],
+        	}
+        	service { 'apache2':
+                	ensure => 'true',
+                	enable => 'true',
+                	provider => 'systemd',
+        	}
+        	exec { 'a2ensite':
+                	command => 'sudo a2ensite kokeilu.conf',
+                	path => '/bin:/usr/bin:/sbin:/usr/sbin:',
+                	require => File['/etc/apache2/sites-available/oliot.conf'],
+        	}
+        	exec { 'a2dissite':
+                	command => 'sudo a2dissite 000-default.conf',
+                	path => '/bin:/usr/bin:/sbin:/usr/sbin:',
+                	notify => Service['apache2'],
+        	}
+    	}
